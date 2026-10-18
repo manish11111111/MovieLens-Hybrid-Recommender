@@ -2,33 +2,35 @@
 
 ## Overview
 
-This project explores movie recommendation techniques using the MovieLens dataset. It compares popularity-based recommendation, content-based filtering, collaborative filtering, and a hybrid approach that combines collaborative and content-based scores.
+This project is about building a movie recommendation system using the MovieLens dataset. It explores different ways to recommend movies, including popularity-based recommendations, content-based filtering, collaborative filtering, and a hybrid approach.
 
-The main objective is to investigate whether combining user-rating patterns with movie genre information can improve recommendation ranking performance.
+The main goal is to see whether combining information about movies with users' rating patterns can produce better recommendations.
 
-## Recommendation Approaches
+The project also includes a Streamlit web application where users can select a MovieLens user, choose their favourite movies, and compare recommendations from collaborative filtering and the hybrid model.
 
-- **Popularity-Based Recommendation:** Ranks movies using rating counts and average ratings.
-- **Content-Based Filtering:** Uses TF-IDF and cosine similarity to identify movies with similar genres.
-- **Collaborative Filtering:** Uses similarities between users and their rating patterns to estimate preferences.
-- **Hybrid Recommendation:** Combines collaborative-filtering and genre-based content scores.
+## Recommendation Methods
+
+- **Popularity-Based Recommendation:** Recommends movies based on their average ratings and the number of ratings they have received.
+- **Content-Based Filtering:** Uses TF-IDF and cosine similarity to find movies with similar genres and tags.
+- **Collaborative Filtering:** Looks at the ratings of similar users to predict which movies a user might enjoy.
+- **Hybrid Recommendation:** Combines collaborative-filtering predictions with content-based similarity scores to rank movies.
 
 ## Dataset
 
-This project uses the [MovieLens latest-small dataset](https://grouplens.org/datasets/movielens/latest/), provided by GroupLens Research.
+This project uses the [MovieLens latest-small dataset](https://grouplens.org/datasets/movielens/latest/) from GroupLens Research.
 
-The dataset files are not included in this repository to keep it lightweight.
+The dataset is not included in this repository, so it needs to be downloaded separately.
 
-### Setup
+### Getting Started
 
-1. Download the `ml-latest-small.zip` dataset from the [official MovieLens website](https://grouplens.org/datasets/movielens/latest/).
-2. Extract the ZIP file.
-3. Copy the following files into the project's `data/` directory:
+1. Download `ml-latest-small.zip` from the [official MovieLens website](https://grouplens.org/datasets/movielens/latest/).
+2. Extract the downloaded ZIP file.
+3. Copy these three files into the project's `data/` directory:
    - `movies.csv`
    - `ratings.csv`
    - `tags.csv`
 
-Your project structure should look like this:
+The project structure should look similar to this:
 
 ```text
 MovieLens-Project/
@@ -37,28 +39,29 @@ MovieLens-Project/
 │   ├── ratings.csv
 │   └── tags.csv
 ├── src/
+│   └── validate_hybrid.py
+├── app.py
+├── requirements.txt
 ├── README.md
 ├── .gitignore
 └── test_results.png
 ```
 
-After placing the files in the correct directory, run the relevant Python script from the project root.
+## Model Evaluation
 
-## Evaluation Methodology
+To compare the recommendation methods, the ratings data was divided into training, validation, and test sets.
 
-The dataset was divided into training, validation, and test sets.
-
-| Split | Number of ratings |
+| Dataset Split | Number of Ratings |
 |---|---:|
 | Training | 70,585 |
 | Validation | 10,083 |
 | Test | 20,168 |
 
-Hybrid model weights were compared on the validation set. The 50% collaborative-filtering and 50% content-based configuration achieved the best validation F1@10 among the tested configurations.
+Different combinations of collaborative-filtering and content-based weights were tested on the validation set. Among the configurations tested, the 50/50 combination achieved the best F1@10 score.
 
-The selected model was then evaluated on the held-out test set.
+The selected configuration was then evaluated using the held-out test set.
 
-## Final Test Results
+## Test Results
 
 | Metric | Collaborative Filtering | Hybrid (50/50) |
 |---|---:|---:|
@@ -66,24 +69,44 @@ The selected model was then evaluated on the held-out test set.
 | Recall@10 | 0.0126 | 0.0246 |
 | F1@10 | 0.0112 | 0.0210 |
 
-In this experiment, the hybrid model outperformed the collaborative-filtering baseline on all three reported ranking metrics.
+In this experiment, the hybrid model performed better than the collaborative-filtering baseline across all three metrics.
 
-Compared with collaborative filtering, the hybrid model achieved approximately:
-- 89% higher Precision@10
-- 95% higher Recall@10
-- 88% higher F1@10
+The hybrid model achieved approximately:
 
-These results come from one fixed random split. Additional experiments across multiple random seeds would help establish how consistent the improvements are.
+- **89% higher Precision@10**
+- **95% higher Recall@10**
+- **88% higher F1@10**
 
-## Evaluation Definitions
+These results suggest that combining rating patterns with movie information can improve recommendation ranking. However, the evaluation used a single random split, so further testing with different random seeds would help determine whether similar improvements can be achieved consistently.
 
-- **Precision@10:** The proportion of the top 10 recommendations that are relevant.
-- **Recall@10:** The proportion of relevant held-out items that appear in the top 10 recommendations.
-- **F1@10:** The harmonic mean of Precision@10 and Recall@10.
+## Interactive Web Application
 
-A held-out rating of 4.0 or higher is treated as relevant.
+The project includes a Streamlit application for exploring movie recommendations.
 
-## Technologies
+Users can:
+
+- Select a MovieLens user ID.
+- Choose their favourite movies.
+- Generate collaborative-filtering recommendations.
+- Compare them with hybrid recommendations.
+- View predicted ratings and recommendation scores.
+- Download the results as CSV files.
+
+The current application uses a **70% collaborative-filtering and 30% content-based** weighting for its hybrid recommendations.
+
+This differs from the 50/50 configuration used for the evaluation results above. The reported test metrics therefore describe the tested 50/50 model, not necessarily the current application configuration.
+
+Movies without valid collaborative-filtering predictions are excluded rather than assigned a fallback rating. The current implementation also requires at least two similar users to have rated a candidate movie.
+
+## Evaluation Metrics
+
+- **Precision@10:** Measures how many of the top 10 recommended movies are relevant.
+- **Recall@10:** Measures how many relevant movies appear among the top 10 recommendations.
+- **F1@10:** Combines precision and recall into a single metric.
+
+For this project, a movie with a held-out rating of 4.0 or higher is considered relevant.
+
+## Technologies Used
 
 - Python
 - pandas
@@ -91,27 +114,56 @@ A held-out rating of 4.0 or higher is treated as relevant.
 - scikit-learn
 - TF-IDF
 - Cosine similarity
+- Streamlit
 - VS Code
 
 ## Limitations
 
-- Genre-based features provide limited information about a movie's actual content.
-- The dataset is relatively small compared with production recommendation datasets.
-- Results may vary across different data splits.
-- Recommendation performance depends on the candidate-generation and scoring methods.
+- Genres and tags do not capture every aspect of a movie.
+- The dataset is relatively small compared with those used by large commercial recommendation platforms.
+- Results can change depending on how the data is split.
+- Recommendations depend on the available ratings and the way candidate movies are selected and ranked.
+- Users or movies with limited rating data can be difficult to handle accurately.
 
-## Future Work
+## Future Improvements
 
-- Evaluate models across multiple random seeds.
-- Compare against additional baseline recommenders.
-- Investigate richer movie metadata.
-- Develop an interactive interface for generating recommendations.
-- Explore knowledge graphs to represent relationships between movies, actors, directors, and genres.
+There are several ways this project could be improved:
+
+- Test the models using multiple random seeds.
+- Compare the results with additional recommendation methods.
+- Include more detailed movie information.
+- Improve the ranking and evaluation process.
+- Explore knowledge graphs to represent connections between movies, actors, directors, and genres.
+- Make the recommendation application available online.
 
 ## How to Run
-From the project root, activate the Python environment and run:
+
+### 1. Install the Required Packages
+
+Open a terminal in the project directory and run:
+
+```powershell
+pip install -r requirements.txt
+```
+
+### 2. Run the Evaluation Script
+
+Make sure the MovieLens dataset is available in the `data/` directory, then run:
 
 ```powershell
 python src/validate_hybrid.py
 ```
-Make sure the required Python packages are installed and the MovieLens CSV files are available in the `data/` directory.
+
+### 3. Start the Web Application
+
+Run the following command from the project root:
+
+```powershell
+streamlit run app.py
+```
+
+Open the local URL shown in the terminal to use the application.
+
+## Acknowledgements
+
+Thanks to [GroupLens Research](https://grouplens.org/) for providing the MovieLens dataset used in this project.
