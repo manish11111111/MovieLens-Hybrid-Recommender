@@ -29,3 +29,6 @@ Thumbs.db
 
 # Dataset - not uploaded to GitHub
 data/
+
+#secrets'
+.streamlit/secrets.toml

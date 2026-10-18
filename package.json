@@ -1,0 +1,11 @@
+
+{
+  "name": "movielens-project",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k -n BACKEND,FRONTEND -c blue,green \"..\\MovieLens-Project\\.venv\\Scripts\\python.exe -m uvicorn backend.main:app --reload\" \"npm --prefix frontend run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}
