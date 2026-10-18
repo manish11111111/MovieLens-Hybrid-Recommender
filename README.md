@@ -1,106 +1,102 @@
-# MovieLens – AI Movie Recommender
+# MovieLens Hybrid Recommender System
 
-A movie recommendation system built with Python, Streamlit, and machine learning. It combines collaborative filtering with content-based filtering to recommend movies based on a user's preferences and the behavior of similar users.
+A movie recommendation system that combines collaborative filtering and content-based filtering to generate personalized movie recommendations.
+
+**Live Demo:** https://movielens-hybrid-recommender1111.streamlit.app/
+
+**Repository:** https://github.com/manish11111111/MovieLens-Hybrid-Recommender
+
+## About the Project
+
+I built this project to explore how recommendation systems work and how machine learning techniques can help personalize movie suggestions.
+
+The system combines two approaches. Collaborative filtering uses patterns in user ratings, while content-based filtering uses movie characteristics such as genres and tags.
+
+I evaluated different combinations of these approaches and selected a 50/50 hybrid configuration based on validation results.
 
 ## Features
 
-- **Hybrid recommendations:** Combines collaborative filtering and content-based filtering with equal weights.
-- **Personalized suggestions:** Uses a selected user's rating history and favorite movies.
-- **Movie discovery:** Displays recommended movies with their scores and available movie information.
-- **Adjustable results:** Choose how many recommendations to display.
-- **CSV export:** Download recommendation results for further analysis.
+- Personalized movie recommendations
+- User selection and favorite movie selection
+- Adjustable number of recommendations
+- Interactive interface built with Streamlit
+- Downloadable recommendations in CSV format
+- Model evaluation using Precision@10, Recall@10 and F1@10
+
+## Technologies Used
+
+- Python
+- Pandas
+- NumPy
+- Scikit-learn
+- Streamlit
+- Git and GitHub
 
 ## How It Works
 
-The recommender combines two approaches:
+### Collaborative Filtering
 
-- **Collaborative filtering (50%):** Uses rating patterns and similarities between users to estimate which movies a user may enjoy.
-- **Content-based filtering (50%):** Uses movie features, including genres and tags in the interactive application, to find movies related to a user's preferences.
+Uses patterns in user ratings to estimate which movies a user may enjoy.
 
-The final hybrid score is calculated as:
+### Content-Based Filtering
+
+Uses movie information, including genres and tags, to identify movies with similar characteristics.
+
+### Hybrid Recommendation
+
+Combines both approaches using equal weights:
 
 `Hybrid Score = 0.5 × CF Score + 0.5 × Content Score`
 
-The scores are normalized before combining them so that both approaches contribute on comparable scales.
+The 50/50 configuration achieved the highest F1@10 among the configurations evaluated on the validation set.
 
-## Dataset
+## Model Evaluation
 
-This project uses the MovieLens latest-small dataset, which contains movie information and user ratings.
+The dataset was divided into training, validation and test sets using a 70/10/20 split.
 
-The ratings dataset was divided into three subsets:
-
-| Split | Ratings | Percentage |
+| Dataset split | Number of ratings | Percentage |
 |---|---:|---:|
 | Training | 70,585 | 70% |
 | Validation | 10,083 | 10% |
 | Test | 20,168 | 20% |
 
-The validation set was used to compare hybrid configurations. The selected configuration was then evaluated on the held-out test set.
+### Final Test Results
 
-## Model Evaluation
+| Model | Precision@10 | Recall@10 | F1@10 |
+|---|---:|---:|---:|
+| Collaborative Filtering | 0.0146 | 0.0126 | 0.0112 |
+| Hybrid (50/50) | 0.0276 | 0.0246 | 0.0210 |
 
-The validation experiment compared five combinations of collaborative filtering and content-based filtering. Hybrid 50/50 achieved the highest validation F1@10 and was selected for final testing.
+The hybrid model achieved an F1@10 of 0.0210, compared with 0.0112 for the collaborative filtering baseline. This represents an approximately 87.5% relative improvement in F1@10 on the test set.
 
-### Final test results
+These results indicate that combining rating patterns with movie content improved performance in this evaluation.
 
-| Metric | Collaborative Filtering | Hybrid 50/50 |
-|---|---:|---:|
-| Precision@10 | 0.0146 | 0.0276 |
-| Recall@10 | 0.0126 | 0.0246 |
-| F1@10 | 0.0112 | 0.0210 |
+**Evaluation note:** The validation script uses genres for content features, while the deployed application also uses tags. As a result, recommendations from the live application may differ from the evaluation results.
 
-The hybrid model outperformed the collaborative filtering baseline on all three reported ranking metrics in this experiment.
+## Running the Project Locally
 
-These results represent offline evaluation on the specified data split. They do not guarantee that every recommendation will match an individual user's preferences.
+### Prerequisites
 
-### Evaluation and application differences
-
-The validation script uses movie genres with TF-IDF for content-based features. The interactive application also incorporates tags. Therefore, the application uses the same 50/50 weighting strategy but its recommendations may differ from those produced by the evaluation script.
-
-## Technologies Used
-
-- Python
-- Streamlit
-- Pandas
-- NumPy
-- Scikit-learn
-- TF-IDF vectorization
-- Cosine similarity
-
-## Project Structure
-
-```text
-MovieLens-Project/
-├── app.py
-├── requirements.txt
-├── data/
-│   ├── movies.csv
-│   ├── ratings.csv
-│   └── tags.csv
-└── src/
-    └── validate_hybrid.py
-```
-
-## Getting Started
+- Python 3.10 or later
+- Git
+- The required MovieLens dataset files
 
 ### 1. Clone the repository
 
 ```bash
-git clone YOUR_REPOSITORY_URL
-cd MovieLens-Project
+git clone https://github.com/manish11111111/MovieLens-Hybrid-Recommender.git
+cd MovieLens-Hybrid-Recommender
 ```
 
-Replace `YOUR_REPOSITORY_URL` with your GitHub repository URL.
-
-### 2. Create and activate a virtual environment
+### 2. Create a virtual environment
 
 ```bash
 python -m venv .venv
 ```
 
-On Windows:
+On Windows, activate it using:
 
-```bash
+```powershell
 .venv\Scripts\activate
 ```
 
@@ -110,29 +106,58 @@ On Windows:
 pip install -r requirements.txt
 ```
 
-### 4. Run the application
+### 4. Check the dataset
+
+Ensure the required CSV files are available in the `data` directory:
+
+```text
+data/
+├── ratings.csv
+├── movies.csv
+└── tags.csv
+```
+
+### 5. Run the application
 
 ```bash
 streamlit run app.py
 ```
 
-Streamlit will provide a local URL where you can open the application in your browser.
+Open the local URL provided by Streamlit in your browser.
 
-## Limitations
+## Project Structure
 
-- Recommendations depend on the quality and availability of movie ratings and metadata.
-- New users with little or no rating history may receive less personalized recommendations.
-- The offline evaluation uses a particular random data split, so results may vary with other splits or evaluation methods.
-- The current evaluation and interactive application use different content features.
+```text
+MovieLens-Hybrid-Recommender/
+├── app.py
+├── requirements.txt
+├── README.md
+├── .gitignore
+├── data/
+│   ├── ratings.csv
+│   ├── movies.csv
+│   └── tags.csv
+└── src/
+    └── validate_hybrid.py
+```
+
+## What I Learned
+
+This project gave me practical experience with data preparation, feature extraction, similarity-based recommendation techniques, model evaluation and deploying a machine learning application.
+
+It also helped me understand the importance of selecting model configurations using validation data and evaluating final performance on a separate test set.
 
 ## Future Improvements
 
-- Improve recommendations for new users and movies.
-- Compare additional ranking metrics and validation strategies.
-- Experiment with more advanced recommendation algorithms.
-- Add movie posters and richer movie metadata.
-- Evaluate recommendations using user feedback.
+- Improve recommendation quality and cold-start handling
+- Explore additional recommendation algorithms
+- Add automated tests and improve reproducibility
+- Explore database integration and scalable data pipelines
 
 ## Author
 
-Developed as a machine learning and recommendation systems project using the MovieLens dataset.
+**Manish Chapagain**
+
+Computer Engineering Graduate | Aspiring Data & AI Engineer
+
+This project is part of my ongoing journey into data science, machine learning and AI engineering.
