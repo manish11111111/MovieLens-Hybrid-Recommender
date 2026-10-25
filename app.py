@@ -1434,7 +1434,7 @@ try:
         label_visibility="collapsed",
     )
 
-    st.sidebar.caption(f"Crafted by {AUTHOR}")
+    st.sidebar.caption(f"Created by {html.escape(AUTHOR)}")
 
     # ---------- KPI STATS ----------
     st.markdown(
