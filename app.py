@@ -1,5 +1,5 @@
 from pathlib import Path
-import html
+from html import escape
 import re
 
 import numpy as np
@@ -8,15 +8,16 @@ import streamlit as st
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+
 PROJECT_ROOT = Path(__file__).resolve().parent
 DATA_DIR = PROJECT_ROOT / "data"
 
 CF_WEIGHT = 0.70
 CONTENT_WEIGHT = 0.30
 TOP_NEIGHBORS = 20
-
 APP_NAME = "MovieLens"
 AUTHOR = "Manish Chapagain"
+
 
 st.set_page_config(
     page_title=f"{APP_NAME} • {AUTHOR}",
@@ -25,1565 +26,1258 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ---------------------------------------------------------------------------
-# CINEMATIC DARK DESIGN SYSTEM
-# ---------------------------------------------------------------------------
+
 st.markdown(
     """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
-
-:root {
-    --bg-void: #08080c;
-    --bg-base: #0d0d14;
-    --bg-elevated: #13131d;
-    --bg-card: #171722;
-    --bg-card-hover: #1e1e2d;
-    --bg-input: #1a1a26;
-
-    --text-primary: #f5f5f7;
-    --text-secondary: #a1a1b5;
-    --text-tertiary: #6b6b85;
-    --text-disabled: #3d3d52;
-
-    --border-subtle: rgba(255,255,255,0.06);
-    --border-default: rgba(255,255,255,0.10);
-    --border-strong: rgba(255,255,255,0.16);
-
-    --accent: #ff5c5c;
-    --accent-glow: rgba(255,92,92,0.35);
-    --accent-soft: rgba(255,92,92,0.12);
-    --accent-2: #ffb347;
-    --accent-2-soft: rgba(255,179,71,0.14);
-
-    --gold: #ffd93d;
-    --gold-soft: rgba(255,217,61,0.12);
-
-    --success: #4ade80;
-    --success-soft: rgba(74,222,128,0.12);
-
-    --violet: #a78bfa;
-    --violet-soft: rgba(167,139,250,0.12);
-}
-
-html, body, [class*="css"], .stApp {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    color: var(--text-secondary);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-}
-
-.stApp {
-    background: var(--bg-void);
-    background-image:
-        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(255,92,92,0.10), transparent),
-        radial-gradient(ellipse 60% 40% at 100% 0%, rgba(167,139,250,0.06), transparent);
-}
-
-header[data-testid="stHeader"] {
-    background: transparent !important;
-    z-index: 10 !important;
-}
-
-.block-container {
-    padding-top: 1.2rem !important;
-    padding-bottom: 4rem !important;
-    max-width: 1280px;
-}
-
-#MainMenu, footer { visibility: hidden; }
-
-/* Custom scrollbar */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: var(--bg-base); }
-::-webkit-scrollbar-thumb {
-    background: var(--bg-card-hover);
-    border-radius: 99px;
-    border: 2px solid var(--bg-base);
-}
-::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
-
-/* ================= HERO ================= */
-.hero-wrap {
-    position: relative;
-    border-radius: 24px;
-    padding: 3rem 3rem 2.6rem;
-    margin-bottom: 2rem;
-    overflow: hidden;
-    background: linear-gradient(135deg, #151520 0%, #0f0f1a 100%);
-    border: 1px solid var(--border-subtle);
-    isolation: isolate;
-}
-
-.hero-wrap::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -10%;
-    width: 600px;
-    height: 600px;
-    background: radial-gradient(circle, var(--accent-glow) 0%, transparent 60%);
-    filter: blur(60px);
-    z-index: -1;
-    animation: pulseGlow 8s ease-in-out infinite;
-}
-
-.hero-wrap::after {
-    content: '';
-    position: absolute;
-    bottom: -60%;
-    right: -5%;
-    width: 500px;
-    height: 500px;
-    background: radial-gradient(circle, rgba(167,139,250,0.18) 0%, transparent 60%);
-    filter: blur(70px);
-    z-index: -1;
-    animation: pulseGlow 10s ease-in-out infinite reverse;
-}
-
-@keyframes pulseGlow {
-    0%, 100% { opacity: 0.6; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.08); }
-}
-
-.hero-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    background: var(--accent-soft);
-    border: 1px solid rgba(255,92,92,0.25);
-    color: var(--accent);
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    border-radius: 999px;
-    padding: 0.4rem 0.95rem;
-    margin-bottom: 1.4rem;
-}
-
-.hero-eyebrow .dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 8px var(--accent);
-    animation: blink 2s ease-in-out infinite;
-}
-
-@keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
-}
-
-.hero-title {
-    font-family: 'Space Grotesk', sans-serif;
-    color: var(--text-primary);
-    font-size: 3.4rem;
-    font-weight: 700;
-    letter-spacing: -0.045em;
-    line-height: 1.02;
-    margin: 0 0 1rem 0;
-}
-
-.hero-title .gradient {
-    background: linear-gradient(135deg, #ff5c5c 0%, #ffb347 50%, #a78bfa 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-.hero-sub {
-    color: var(--text-secondary);
-    font-size: 1.08rem;
-    line-height: 1.6;
-    max-width: 620px;
-    margin: 0 0 1.8rem 0;
-    font-weight: 400;
-}
-
-.hero-meta {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-    padding-top: 1.6rem;
-    border-top: 1px solid var(--border-subtle);
-}
-
-.hero-meta-item {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-
-.hero-meta-item .icon {
-    width: 32px; height: 32px;
-    border-radius: 9px;
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.9rem;
-}
-
-.hero-meta-item strong {
-    color: var(--text-primary);
-    font-weight: 600;
-}
-
-/* ================= STATS ================= */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
-
-.stat-card {
-    position: relative;
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: 18px;
-    padding: 1.5rem 1.6rem;
-    overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-.stat-card:hover {
-    border-color: var(--border-strong);
-    background: var(--bg-card-hover);
-    transform: translateY(-3px);
-    box-shadow: 0 20px 40px -20px rgba(0,0,0,0.8);
-}
-
-.stat-card:hover::before { opacity: 1; }
-
-.stat-icon {
-    width: 38px; height: 38px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.05rem;
-    margin-bottom: 1.1rem;
-}
-
-.stat-icon.red { background: var(--accent-soft); border: 1px solid rgba(255,92,92,0.2); }
-.stat-icon.gold { background: var(--gold-soft); border: 1px solid rgba(255,217,61,0.2); }
-.stat-icon.violet { background: var(--violet-soft); border: 1px solid rgba(167,139,250,0.2); }
-
-.stat-label {
-    color: var(--text-tertiary);
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-bottom: 0.4rem;
-}
-
-.stat-value {
-    font-family: 'JetBrains Mono', monospace;
-    color: var(--text-primary);
-    font-size: 2.1rem;
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: -0.02em;
-    margin-bottom: 0.4rem;
-}
-
-.stat-sub {
-    color: var(--text-tertiary);
-    font-size: 0.8rem;
-}
-
-
-.model-panel {
-    position: relative;
-    background: linear-gradient(135deg, rgba(255,92,92,0.04) 0%, rgba(167,139,250,0.04) 100%);
-    border: 1px solid var(--border-subtle);
-    border-radius: 18px;
-    padding: 1.6rem 1.8rem;
-    margin-bottom: 2rem;
-    overflow: hidden;
-}
-
-.model-panel::before {
-    content: '';
-    position: absolute;
-    left: 0; top: 0; bottom: 0;
-    width: 3px;
-    background: linear-gradient(180deg, var(--accent), var(--violet));
-}
-
-.model-header {
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-    margin-bottom: 0.9rem;
-}
-
-.model-header .badge {
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--accent);
-    background: var(--accent-soft);
-    border: 1px solid rgba(255,92,92,0.25);
-    border-radius: 6px;
-    padding: 0.25rem 0.6rem;
-}
-
-.model-header h3 {
-    color: var(--text-primary);
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0;
-}
-
-.model-body {
-    color: var(--text-secondary);
-    font-size: 0.92rem;
-    line-height: 1.7;
-    margin: 0 0 1rem 0;
-}
-
-.model-body strong { color: var(--text-primary); font-weight: 600; }
-
-.weight-bar {
-    display: flex;
-    height: 8px;
-    border-radius: 99px;
-    overflow: hidden;
-    background: var(--bg-input);
-    margin: 1rem 0 0.6rem;
-}
-
-.weight-bar .seg-cf {
-    background: linear-gradient(90deg, #ff5c5c, #ff7b7b);
-    height: 100%;
-    transition: all 0.3s;
-}
-
-.weight-bar .seg-content {
-    background: linear-gradient(90deg, #a78bfa, #c4b5fd);
-    height: 100%;
-    transition: all 0.3s;
-}
-
-.weight-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.75rem;
-    color: var(--text-tertiary);
-    font-family: 'JetBrains Mono', monospace;
-}
-
-.weight-labels span strong { color: var(--text-primary); }
-
-.model-foot {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding-top: 1rem;
-    margin-top: 1rem;
-    border-top: 1px solid var(--border-subtle);
-    color: var(--text-tertiary);
-    font-size: 0.8rem;
-}
-
-/* ================= PRIMARY BUTTON ================= */
-.st-key-main_recommend_btn button {
-    position: relative !important;
-    background: linear-gradient(135deg, #ff5c5c 0%, #ff7b4d 100%) !important;
-    color: #ffffff !important;
-    font-family: 'Inter', sans-serif !important;
-    font-size: 1rem !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.01em !important;
-    border: none !important;
-    border-radius: 14px !important;
-    padding: 0.95rem 2.6rem !important;
-    box-shadow: 0 8px 32px -8px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.15) !important;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
-.st-key-main_recommend_btn button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 14px 44px -8px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.2) !important;
-}
-
-.st-key-main_recommend_btn button:active {
-    transform: translateY(0) !important;
-}
-
-/* ================= TABS ================= */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 0 !important;
-    background: var(--bg-card) !important;
-    padding: 5px !important;
-    border-radius: 14px !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-bottom: 1px solid var(--border-subtle) !important;
-    display: inline-flex !important;
-    margin-bottom: 1.8rem !important;
-}
-
-.stTabs [data-baseweb="tab"] {
-    height: 2.6rem !important;
-    padding: 0.5rem 1.4rem !important;
-    font-family: 'Inter', sans-serif !important;
-    font-weight: 600 !important;
-    font-size: 0.87rem !important;
-    color: var(--text-tertiary) !important;
-    background: transparent !important;
-    border-radius: 10px !important;
-    border: none !important;
-    transition: all 0.2s ease !important;
-}
-
-.stTabs [data-baseweb="tab"]:hover {
-    color: var(--text-secondary) !important;
-    background: rgba(255,255,255,0.03) !important;
-}
-
-.stTabs [aria-selected="true"] {
-    background: var(--bg-elevated) !important;
-    color: var(--text-primary) !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 0 0 1px var(--border-default) !important;
-}
-
-.stTabs [data-baseweb="tab-highlight"] { display: none !important; }
-.stTabs [data-baseweb="tab-border"] { display: none !important; }
-
-/* ================= MOVIE CARDS ================= */
-.movie-card {
-    position: relative;
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: 18px;
-    padding: 1.5rem 1.6rem;
-    margin-bottom: 1rem;
-    min-height: 200px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.movie-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-.movie-card:hover {
-    border-color: var(--border-strong);
-    background: var(--bg-card-hover);
-    transform: translateY(-3px);
-    box-shadow: 0 24px 48px -24px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,92,92,0.05);
-}
-
-.movie-card:hover::before { opacity: 1; }
-
-.card-top {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.85rem;
-    margin-bottom: 0.9rem;
-}
-
-.rank-badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: var(--accent);
-    background: var(--accent-soft);
-    border: 1px solid rgba(255,92,92,0.22);
-    border-radius: 7px;
-    padding: 0.32rem 0.55rem;
-    line-height: 1;
-    flex-shrink: 0;
-    letter-spacing: 0.02em;
-}
-
-.movie-title {
-    color: var(--text-primary);
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.12rem;
-    font-weight: 600;
-    line-height: 1.35;
-    margin: 0;
-    flex: 1;
-    letter-spacing: -0.015em;
-}
-
-.year-chip {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem;
-    font-weight: 500;
-    color: var(--text-tertiary);
-    background: var(--bg-input);
-    border: 1px solid var(--border-subtle);
-    border-radius: 6px;
-    padding: 0.22rem 0.5rem;
-    flex-shrink: 0;
-}
-
-.genre-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    margin-bottom: 1.2rem;
-}
-
-.genre-pill {
-    font-size: 0.71rem;
-    font-weight: 500;
-    color: var(--text-secondary);
-    background: var(--bg-input);
-    border: 1px solid var(--border-subtle);
-    border-radius: 999px;
-    padding: 0.22rem 0.65rem;
-    letter-spacing: 0.01em;
-}
-
-.meter-track {
-    width: 100%;
-    height: 4px;
-    background: var(--bg-input);
-    border-radius: 99px;
-    overflow: hidden;
-    margin-bottom: 1rem;
-}
-
-.meter-fill {
-    height: 100%;
-    border-radius: 99px;
-    background: linear-gradient(90deg, #ff5c5c 0%, #ffb347 100%);
-    box-shadow: 0 0 12px var(--accent-glow);
-    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.card-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-top: 0.9rem;
-    border-top: 1px solid var(--border-subtle);
-}
-
-.rating-badge {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.83rem;
-    font-weight: 600;
-    color: var(--gold);
-    background: var(--gold-soft);
-    border: 1px solid rgba(255,217,61,0.18);
-    border-radius: 7px;
-    padding: 0.28rem 0.65rem;
-}
-
-.rating-badge .star {
-    font-size: 0.9rem;
-    line-height: 1;
-}
-
-.rating-badge .pred-label {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.68rem;
-    font-weight: 500;
-    color: rgba(255,217,61,0.6);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.match-badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.82rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    background: linear-gradient(135deg, rgba(255,92,92,0.18), rgba(167,139,250,0.18));
-    border: 1px solid rgba(255,92,92,0.2);
-    border-radius: 7px;
-    padding: 0.28rem 0.7rem;
-}
-
-/* ================= SIDEBAR ================= */
-[data-testid="stSidebar"] {
-    background: var(--bg-base) !important;
-    border-right: 1px solid var(--border-subtle) !important;
-}
-
-[data-testid="stSidebar"] > div:first-child { padding-top: 0 !important; }
-
-.side-brand {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding-bottom: 0.3rem;
-}
-
-.side-brand .logo {
-    width: 34px; height: 34px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #ff5c5c, #ffb347);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    box-shadow: 0 4px 16px var(--accent-glow);
-}
-
-.side-brand .name {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    letter-spacing: -0.02em;
-}
-
-.side-section {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--text-tertiary);
-    margin: 1.1rem 0 0.5rem 0;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-}
-
-.side-section .count {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 500;
-    color: var(--text-tertiary);
-    letter-spacing: 0;
-}
-
-.user-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: 10px;
-    padding: 0.45rem 0.8rem;
-    font-size: 0.79rem;
-    font-weight: 500;
-    color: var(--text-secondary);
-    margin: 0.4rem 0 0.2rem 0;
-}
-
-.user-pill .dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--success);
-    box-shadow: 0 0 8px var(--success);
-}
-
-.user-pill strong {
-    color: var(--text-primary);
-    font-weight: 600;
-    font-family: 'JetBrains Mono', monospace;
-}
-
-.fav-item-row {
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: 9px;
-    padding: 0.55rem 0.7rem;
-    font-size: 0.79rem;
-    font-weight: 500;
-    color: var(--text-secondary);
-    line-height: 1.35;
-    word-break: break-word;
-    transition: all 0.2s ease;
-}
-
-.fav-item-row:hover {
-    border-color: var(--border-default);
-    color: var(--text-primary);
-}
-
-/* Sidebar buttons (remove) */
-div[data-testid="stSidebar"] div.stButton > button {
-    border-radius: 7px !important;
-    padding: 0.25rem 0.5rem !important;
-    min-height: 2.05rem !important;
-    height: 2.05rem !important;
-    background: var(--bg-card) !important;
-    color: var(--text-tertiary) !important;
-    border: 1px solid var(--border-subtle) !important;
-    font-size: 0.75rem !important;
-    font-weight: 600 !important;
-    box-shadow: none !important;
-    transition: all 0.15s ease !important;
-}
-
-div[data-testid="stSidebar"] div.stButton > button:hover {
-    background: var(--accent-soft) !important;
-    color: var(--accent) !important;
-    border-color: rgba(255,92,92,0.3) !important;
-    transform: none !important;
-}
-
-/* Add to favorites button */
-div[data-testid="stSidebar"] .st-key-add_movie_btn button {
-    background: linear-gradient(135deg, #ff5c5c, #ff7b4d) !important;
-    color: #ffffff !important;
-    border: none !important;
-    width: 100% !important;
-    font-size: 0.82rem !important;
-    font-weight: 600 !important;
-    height: 2.4rem !important;
-    border-radius: 9px !important;
-    box-shadow: 0 4px 16px -4px var(--accent-glow) !important;
-}
-div[data-testid="stSidebar"] .st-key-add_movie_btn button:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 6px 20px -4px var(--accent-glow) !important;
-}
-
-/* Sidebar inputs */
-[data-testid="stSidebar"] [data-baseweb="select"] > div,
-[data-testid="stSidebar"] [data-baseweb="input"] > div,
-[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] > div {
-    background: var(--bg-card) !important;
-    border-color: var(--border-subtle) !important;
-    border-radius: 9px !important;
-    color: var(--text-secondary) !important;
-    font-size: 0.84rem !important;
-}
-
-[data-testid="stSidebar"] [data-baseweb="select"]:hover > div {
-    border-color: var(--border-default) !important;
-}
-
-[data-testid="stSidebar"] [data-baseweb="select"] [role="listbox"] {
-    background: var(--bg-elevated) !important;
-    border: 1px solid var(--border-default) !important;
-}
-
-[data-testid="stSidebar"] [data-baseweb="popover"] {
-    background: var(--bg-elevated) !important;
-    border: 1px solid var(--border-default) !important;
-    border-radius: 10px !important;
-}
-
-/* Slider */
-[data-testid="stSidebar"] .stSlider [data-baseweb="slider"] div[role="slider"] {
-    background: var(--accent) !important;
-    box-shadow: 0 0 0 3px var(--accent-soft) !important;
-}
-
-[data-testid="stSidebar"] .stSlider [data-baseweb="slider"] > div > div {
-    background: linear-gradient(90deg, var(--accent), var(--accent-2)) !important;
-}
-
-[data-testid="stSidebar"] .stSlider [data-testid="stTickBar"] {
-    color: var(--text-tertiary) !important;
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.7rem !important;
-}
-
-/* Sidebar divider */
-[data-testid="stSidebar"] hr {
-    border-color: var(--border-subtle) !important;
-    margin: 0.8rem 0 !important;
-}
-
-[data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: 0.5rem !important; }
-[data-testid="stSidebar"] [data-testid="stHorizontalBlock"] { gap: 0.4rem; align-items: center; }
-[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { margin-bottom: 0; }
-[data-testid="stSidebarHeader"] { height: 2.2rem; min-height: 0; padding: 0.3rem 1rem 0 1rem; }
-
-/* ================= MAIN AREA WIDGETS ================= */
-[data-testid="stExpander"] {
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: 12px !important;
-    overflow: hidden;
-}
-[data-testid="stExpander"] summary {
-    color: var(--text-secondary) !important;
-    font-size: 0.85rem !important;
-    font-weight: 500 !important;
-}
-[data-testid="stExpander"] summary:hover { color: var(--text-primary) !important; }
-
-/* Dataframe */
-[data-testid="stDataFrame"] {
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: 10px !important;
-    overflow: hidden;
-}
-
-/* Download button */
-.stDownloadButton button {
-    background: var(--bg-card) !important;
-    color: var(--text-secondary) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: 10px !important;
-    font-size: 0.82rem !important;
-    font-weight: 500 !important;
-    padding: 0.5rem 1rem !important;
-    transition: all 0.2s ease !important;
-}
-.stDownloadButton button:hover {
-    background: var(--bg-card-hover) !important;
-    color: var(--text-primary) !important;
-    border-color: var(--border-default) !important;
-}
-
-/* Alerts / info */
-[data-testid="stAlert"] {
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: 10px !important;
-    color: var(--text-secondary) !important;
-    font-size: 0.85rem !important;
-}
-
-/* Section titles */
-.section-title {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    letter-spacing: -0.025em;
-    margin: 2.2rem 0 0.5rem 0;
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-}
-
-.section-title .accent-line {
-    width: 3px;
-    height: 24px;
-    background: linear-gradient(180deg, var(--accent), var(--accent-2));
-    border-radius: 2px;
-}
-
-.section-desc {
-    color: var(--text-tertiary);
-    font-size: 0.92rem;
-    line-height: 1.6;
-    margin-bottom: 1.5rem;
-}
-
-/* Footer */
-.app-footer {
-    margin-top: 4rem;
-    padding: 2rem 0 0;
-    border-top: 1px solid var(--border-subtle);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-    color: var(--text-tertiary);
-    font-size: 0.8rem;
-}
-
-.app-footer .brand {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    color: var(--text-secondary);
-}
-
-.app-footer .brand strong {
-    color: var(--text-primary);
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 600;
-}
-
-.app-footer .tech {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.02em;
-}
-
-</style>
-""",
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+    :root {
+        --bg-primary: #090b10;
+        --bg-secondary: #10131b;
+        --bg-card: #141923;
+        --bg-card-hover: #1a2030;
+        --text-primary: #f5f7fb;
+        --text-secondary: #a4adbd;
+        --text-tertiary: #778195;
+        --accent: #ff5c5c;
+        --accent-secondary: #ffb347;
+        --border-subtle: rgba(255,255,255,0.09);
+        --gradient: linear-gradient(110deg, #ff5c5c 0%, #ffb347 55%, #a78bfa 100%);
+    }
+
+    html, body, [class*="css"] {
+        font-family: 'DM Sans', sans-serif;
+    }
+
+    .stApp {
+        background:
+            radial-gradient(ellipse at 10% 0%, rgba(255,92,92,0.08), transparent 36%),
+            radial-gradient(ellipse at 90% 12%, rgba(167,139,250,0.07), transparent 32%),
+            var(--bg-primary);
+        color: var(--text-primary);
+    }
+
+    [data-testid="stHeader"] {
+        background: rgba(9,11,16,0.8);
+    }
+
+    [data-testid="stSidebar"] {
+        background: #0c0f16;
+        border-right: 1px solid var(--border-subtle);
+    }
+
+    [data-testid="stSidebar"] > div:first-child {
+        padding-top: 1.4rem;
+    }
+
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        color: var(--text-secondary);
+    }
+
+    h1, h2, h3, h4 {
+        font-family: 'Space Grotesk', sans-serif !important;
+        color: var(--text-primary);
+        letter-spacing: -0.035em;
+    }
+
+    p, li, label {
+        color: var(--text-secondary);
+    }
+
+    .hero {
+        position: relative;
+        overflow: hidden;
+        padding: 2.4rem 2.3rem;
+        margin: 0.2rem 0 1.8rem;
+        border: 1px solid var(--border-subtle);
+        border-radius: 24px;
+        background:
+            radial-gradient(circle at 90% 15%, rgba(167,139,250,0.16), transparent 30%),
+            radial-gradient(circle at 75% 100%, rgba(255,92,92,0.12), transparent 35%),
+            linear-gradient(135deg, #151a26 0%, #10131b 65%, #191420 100%);
+    }
+
+    .hero-eyebrow {
+        color: #ffb347;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.19em;
+        text-transform: uppercase;
+        margin-bottom: 0.8rem;
+    }
+
+    .hero-title {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: clamp(2.3rem, 5vw, 4.1rem);
+        line-height: 1.03;
+        font-weight: 700;
+        letter-spacing: -0.065em;
+        color: #ffffff;
+        margin-bottom: 1rem;
+    }
+
+    .gradient-text {
+        background: var(--gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .hero-description {
+        max-width: 690px;
+        font-size: 1rem;
+        line-height: 1.75;
+        color: #aeb6c7;
+    }
+
+    .section-kicker {
+        font-size: 0.69rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--text-tertiary);
+        margin-bottom: 0.35rem;
+    }
+
+    .section-heading {
+        font-family: 'Space Grotesk', sans-serif;
+        color: var(--text-primary);
+        font-size: 1.45rem;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        margin-bottom: 1rem;
+    }
+
+    .stat-card {
+        background: linear-gradient(145deg, #171c28, #10131b);
+        border: 1px solid var(--border-subtle);
+        border-radius: 17px;
+        padding: 1.1rem 1.2rem;
+        min-height: 112px;
+    }
+
+    .stat-label {
+        color: var(--text-tertiary);
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        margin-bottom: 0.6rem;
+    }
+
+    .stat-value {
+        color: #ffffff;
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 1.8rem;
+        font-weight: 700;
+        letter-spacing: -0.05em;
+    }
+
+    .stat-note {
+        color: var(--text-secondary);
+        font-size: 0.76rem;
+        margin-top: 0.25rem;
+    }
+
+    .model-panel {
+        padding: 1.2rem 1.4rem;
+        margin: 1.2rem 0 1.6rem;
+        border-radius: 16px;
+        border: 1px solid var(--border-subtle);
+        background: rgba(20,25,35,0.75);
+    }
+
+    .model-title {
+        font-family: 'Space Grotesk', sans-serif;
+        color: #ffffff;
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: 0.45rem;
+    }
+
+    .model-description {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        line-height: 1.65;
+    }
+
+    .model-pill {
+        display: inline-block;
+        border-radius: 999px;
+        border: 1px solid rgba(255,179,71,0.28);
+        background: rgba(255,179,71,0.08);
+        color: #ffca7a;
+        padding: 0.3rem 0.65rem;
+        font-size: 0.69rem;
+        font-weight: 700;
+        margin: 0.25rem 0.25rem 0 0;
+    }
+
+    .movie-card {
+        height: 100%;
+        min-height: 180px;
+        padding: 1.15rem;
+        margin-bottom: 0.8rem;
+        background: linear-gradient(145deg, #171c28, #11141d);
+        border: 1px solid var(--border-subtle);
+        border-radius: 17px;
+        transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .movie-card:hover {
+        border-color: rgba(255,179,71,0.42);
+        transform: translateY(-2px);
+    }
+
+    .movie-rank {
+        color: #ffb347;
+        font-size: 0.67rem;
+        font-weight: 700;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        margin-bottom: 0.55rem;
+    }
+
+    .movie-title {
+        color: #ffffff;
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 1.03rem;
+        font-weight: 700;
+        line-height: 1.4;
+        margin-bottom: 0.55rem;
+        overflow-wrap: anywhere;
+    }
+
+    .movie-year {
+        color: #aab3c4;
+        font-size: 0.78rem;
+        font-weight: 500;
+    }
+
+    .movie-genres {
+        color: #9ba5b7;
+        font-size: 0.77rem;
+        line-height: 1.6;
+        margin: 0.65rem 0;
+    }
+
+    .movie-score {
+        display: inline-block;
+        padding: 0.3rem 0.55rem;
+        border-radius: 8px;
+        background: rgba(255,92,92,0.11);
+        color: #ff9292;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
+    .movie-match {
+        display: inline-block;
+        padding: 0.3rem 0.55rem;
+        border-radius: 8px;
+        background: rgba(167,139,250,0.12);
+        color: #c6b5ff;
+        font-size: 0.75rem;
+        font-weight: 700;
+        margin-left: 0.3rem;
+    }
+
+    .sidebar-brand {
+        padding: 0.2rem 0 1.3rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .sidebar-brand-title {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 1.55rem;
+        font-weight: 700;
+        letter-spacing: -0.06em;
+        color: #ffffff;
+    }
+
+    .sidebar-brand-subtitle {
+        font-size: 0.72rem;
+        color: var(--text-tertiary);
+        margin-top: 0.2rem;
+    }
+
+    .sidebar-credit {
+        margin-top: 1.2rem;
+        padding: 1rem 0.2rem 0.6rem;
+        border-top: 1px solid var(--border-subtle);
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+    }
+
+    .credit-label {
+        color: var(--text-tertiary);
+        font-family: 'Inter', sans-serif;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    .credit-name {
+        width: fit-content;
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 1.05rem;
+        font-weight: 700;
+        letter-spacing: -0.035em;
+        background: var(--gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    div.stButton > button {
+        border: 1px solid rgba(255,179,71,0.35);
+        border-radius: 11px;
+        min-height: 2.8rem;
+        color: #ffffff;
+        background: linear-gradient(110deg, rgba(255,92,92,0.95), rgba(255,139,76,0.95));
+        font-family: 'DM Sans', sans-serif;
+        font-weight: 700;
+        transition: filter 0.2s ease, transform 0.2s ease;
+    }
+
+    div.stButton > button:hover {
+        color: #ffffff;
+        filter: brightness(1.1);
+        transform: translateY(-1px);
+        border-color: rgba(255,179,71,0.7);
+    }
+
+    div.stButton > button:focus {
+        color: #ffffff;
+        box-shadow: 0 0 0 2px rgba(255,179,71,0.22);
+    }
+
+    [data-testid="stDownloadButton"] button {
+        border-radius: 10px;
+        border: 1px solid var(--border-subtle);
+        background: #171c28;
+        color: #f5f7fb;
+    }
+
+    [data-testid="stTabs"] button {
+        color: var(--text-secondary);
+        font-weight: 600;
+    }
+
+    [data-testid="stTabs"] button[aria-selected="true"] {
+        color: #ffb347;
+    }
+
+    [data-baseweb="select"] > div,
+    [data-baseweb="input"] > div,
+    [data-baseweb="textarea"] > div {
+        background: #131823;
+        border-color: var(--border-subtle);
+        border-radius: 10px;
+    }
+
+    [data-testid="stSlider"] [role="slider"] {
+        background-color: #ffb347;
+    }
+
+    .empty-state {
+        padding: 2.2rem 1.4rem;
+        text-align: center;
+        background: rgba(20,25,35,0.6);
+        border: 1px dashed rgba(255,255,255,0.15);
+        border-radius: 17px;
+        color: var(--text-secondary);
+    }
+
+    .empty-state-title {
+        color: #ffffff;
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .app-footer {
+        margin-top: 3rem;
+        padding: 1.5rem 0 1rem;
+        border-top: 1px solid var(--border-subtle);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.7rem;
+    }
+
+    .footer-brand {
+        font-family: 'Space Grotesk', sans-serif;
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 0.9rem;
+    }
+
+    .footer-credit {
+        color: var(--text-tertiary);
+        font-size: 0.75rem;
+    }
+
+    .footer-credit span {
+        color: #ffb347;
+        font-weight: 600;
+    }
+
+    hr {
+        border-color: var(--border-subtle);
+    }
+
+    @media (max-width: 700px) {
+        .hero {
+            padding: 1.6rem 1.25rem;
+            border-radius: 18px;
+        }
+
+        .hero-title {
+            font-size: 2.35rem;
+        }
+
+        .stat-card {
+            padding: 0.9rem;
+        }
+
+        .stat-value {
+            font-size: 1.45rem;
+        }
+    }
+    </style>
+    """,
     unsafe_allow_html=True,
 )
 
-# ---------------------------------------------------------------------------
-# Data Loading (unchanged)
-# ---------------------------------------------------------------------------
-@st.cache_resource
+
+@st.cache_data(show_spinner=False)
 def load_data():
     ratings_path = DATA_DIR / "ratings.csv"
     movies_path = DATA_DIR / "movies.csv"
     tags_path = DATA_DIR / "tags.csv"
 
+    if not ratings_path.exists():
+        raise FileNotFoundError(f"Missing file: {ratings_path}")
+
+    if not movies_path.exists():
+        raise FileNotFoundError(f"Missing file: {movies_path}")
+
     ratings = pd.read_csv(ratings_path)
     movies = pd.read_csv(movies_path)
-    tags = pd.read_csv(tags_path)
 
-    required_rating_cols = {"userId", "movieId", "rating"}
-    required_movie_cols = {"movieId", "title", "genres"}
-    required_tag_cols = {"movieId", "tag"}
+    if tags_path.exists():
+        tags = pd.read_csv(tags_path)
+    else:
+        tags = pd.DataFrame(columns=["userId", "movieId", "tag"])
 
-    if not required_rating_cols.issubset(ratings.columns):
-        raise ValueError("ratings.csv is missing required columns.")
-    if not required_movie_cols.issubset(movies.columns):
-        raise ValueError("movies.csv is missing required columns.")
-    if not required_tag_cols.issubset(tags.columns):
-        raise ValueError("tags.csv is missing required columns.")
+    required_ratings = {"userId", "movieId", "rating"}
+    required_movies = {"movieId", "title", "genres"}
 
-    for column in ["userId", "movieId", "rating"]:
-        ratings[column] = pd.to_numeric(ratings[column], errors="coerce")
+    if not required_ratings.issubset(ratings.columns):
+        raise ValueError(
+            "ratings.csv must contain userId, movieId, and rating columns."
+        )
 
-    ratings = ratings.dropna(subset=["userId", "movieId", "rating"]).copy()
-    ratings["userId"] = ratings["userId"].astype(int)
-    ratings["movieId"] = ratings["movieId"].astype(int)
-    ratings = ratings[ratings["rating"].between(0.5, 5.0)].copy()
+    if not required_movies.issubset(movies.columns):
+        raise ValueError(
+            "movies.csv must contain movieId, title, and genres columns."
+        )
 
-    movies = movies.drop_duplicates(subset=["movieId"]).copy()
+    ratings = ratings[["userId", "movieId", "rating"]].copy()
+    movies = movies.copy()
+
+    ratings["userId"] = pd.to_numeric(ratings["userId"], errors="coerce")
+    ratings["movieId"] = pd.to_numeric(ratings["movieId"], errors="coerce")
+    ratings["rating"] = pd.to_numeric(ratings["rating"], errors="coerce")
     movies["movieId"] = pd.to_numeric(movies["movieId"], errors="coerce")
-    movies = movies.dropna(subset=["movieId"]).copy()
-    movies["movieId"] = movies["movieId"].astype(int)
 
-    tags["movieId"] = pd.to_numeric(tags["movieId"], errors="coerce")
-    tags = tags.dropna(subset=["movieId"]).copy()
-    tags["movieId"] = tags["movieId"].astype(int)
-
-    tags_by_movie = (
-        tags.groupby("movieId")["tag"]
-        .apply(lambda values: " ".join(values.dropna().astype(str)))
-        .reset_index()
+    ratings = ratings.dropna(
+        subset=["userId", "movieId", "rating"]
     )
 
-    movies = movies.merge(tags_by_movie, on="movieId", how="left")
-    movies["title"] = movies["title"].fillna("Unknown title")
-    movies["genres"] = movies["genres"].fillna("(Genres unknown)")
-    movies["tag"] = movies["tag"].fillna("")
+    movies = movies.dropna(
+        subset=["movieId", "title"]
+    )
 
-    movies["content"] = (
-        movies["genres"].str.replace("|", " ", regex=False) + " " + movies["tag"]
-    ).str.strip()
+    ratings["userId"] = ratings["userId"].astype(int)
+    ratings["movieId"] = ratings["movieId"].astype(int)
+    movies["movieId"] = movies["movieId"].astype(int)
+
+    ratings = ratings[
+        ratings["rating"].between(0.5, 5.0)
+    ]
+
+    ratings = ratings.drop_duplicates(
+        subset=["userId", "movieId"],
+        keep="last",
+    )
+
+    movies["title"] = movies["title"].fillna("Unknown title").astype(str)
+    movies["genres"] = movies["genres"].fillna("").astype(str)
+
+    if not tags.empty and {"movieId", "tag"}.issubset(tags.columns):
+        tags["movieId"] = pd.to_numeric(
+            tags["movieId"], errors="coerce"
+        )
+        tags = tags.dropna(subset=["movieId"])
+        tags["movieId"] = tags["movieId"].astype(int)
+        tags["tag"] = tags["tag"].fillna("").astype(str)
+
+        tag_text = (
+            tags.groupby("movieId")["tag"]
+            .apply(lambda values: " ".join(values))
+            .rename("tag_text")
+            .reset_index()
+        )
+
+        movies = movies.merge(
+            tag_text,
+            on="movieId",
+            how="left",
+        )
+    else:
+        movies["tag_text"] = ""
+
+    movies["tag_text"] = movies["tag_text"].fillna("")
+
+    movies["year"] = movies["title"].str.extract(
+        r"\((\d{4})\)\s*$"
+    )
+
+    movies["clean_title"] = movies["title"].str.replace(
+        r"\s*\(\d{4}\)\s*$",
+        "",
+        regex=True,
+    )
+
+    movies["content_text"] = (
+        movies["clean_title"].fillna("")
+        + " "
+        + movies["genres"].str.replace("|", " ", regex=False)
+        + " "
+        + movies["tag_text"]
+    ).str.lower()
+
+    movies = movies.drop_duplicates(
+        subset=["movieId"],
+        keep="last",
+    ).reset_index(drop=True)
+
+    valid_movie_ids = set(movies["movieId"])
+    ratings = ratings[
+        ratings["movieId"].isin(valid_movie_ids)
+    ].copy()
+
+    if ratings.empty:
+        raise ValueError("No valid ratings match the movies dataset.")
 
     vectorizer = TfidfVectorizer(
         stop_words="english",
-        token_pattern=r"(?u)\b\w+\b",
-        dtype=np.float32,
-    )
-    tfidf_matrix = vectorizer.fit_transform(movies["content"])
-
-    user_movie = ratings.pivot_table(
-        index="userId", columns="movieId", values="rating", aggfunc="mean",
+        ngram_range=(1, 2),
+        max_features=50000,
     )
 
-    rating_array = user_movie.to_numpy(dtype=np.float32)
-    rating_mask = np.isfinite(rating_array)
+    content_matrix = vectorizer.fit_transform(
+        movies["content_text"]
+    )
 
-    global_mean = float(ratings["rating"].mean())
-    user_means = np.nanmean(rating_array, axis=1)
-    user_means = np.nan_to_num(user_means, nan=global_mean)
+    content_similarity = cosine_similarity(
+        content_matrix,
+        dense_output=False,
+    )
 
-    centered = np.where(rating_mask, rating_array - user_means[:, None], 0.0)
+    user_movie_matrix = ratings.pivot(
+        index="userId",
+        columns="movieId",
+        values="rating",
+    ).fillna(0)
 
-    user_similarity = cosine_similarity(centered).astype(np.float32)
-    np.fill_diagonal(user_similarity, 0.0)
+    user_means = ratings.groupby("userId")["rating"].mean()
 
-    movie_ids = movies["movieId"].to_numpy(dtype=int)
-    user_ids = user_movie.index.to_numpy(dtype=int)
-    rating_movie_ids = user_movie.columns.to_numpy(dtype=int)
+    centered_ratings = user_movie_matrix.copy().astype(float)
 
-    movie_to_index = {int(m): i for i, m in enumerate(movie_ids)}
-    user_to_index = {int(u): i for i, u in enumerate(user_ids)}
-    movie_to_rating_col = {int(m): i for i, m in enumerate(rating_movie_ids)}
+    for user_id in centered_ratings.index:
+        rated_mask = centered_ratings.loc[user_id] > 0
+        centered_ratings.loc[user_id, rated_mask] = (
+            centered_ratings.loc[user_id, rated_mask]
+            - user_means.loc[user_id]
+        )
+
+    user_similarity = cosine_similarity(centered_ratings)
+    user_similarity = pd.DataFrame(
+        user_similarity,
+        index=centered_ratings.index,
+        columns=centered_ratings.index,
+    )
+
+    movie_id_to_index = {
+        movie_id: index
+        for index, movie_id in enumerate(movies["movieId"])
+    }
+
+    movie_lookup = movies.set_index("movieId", drop=False)
+
+    title_to_id = {
+        row["title"]: int(row["movieId"])
+        for _, row in movies.sort_values("title").iterrows()
+    }
 
     return {
         "ratings": ratings,
         "movies": movies,
-        "user_movie": user_movie,
-        "rating_array": rating_array,
-        "rating_mask": rating_mask,
-        "user_means": user_means,
+        "tags": tags,
+        "user_movie_matrix": user_movie_matrix,
         "user_similarity": user_similarity,
-        "movie_ids": movie_ids,
-        "user_ids": user_ids,
-        "rating_movie_ids": rating_movie_ids,
-        "movie_to_index": movie_to_index,
-        "user_to_index": user_to_index,
-        "movie_to_rating_col": movie_to_rating_col,
-        "tfidf_matrix": tfidf_matrix,
-        "global_mean": global_mean,
+        "content_matrix": content_matrix,
+        "content_similarity": content_similarity,
+        "movie_id_to_index": movie_id_to_index,
+        "movie_lookup": movie_lookup,
+        "title_to_id": title_to_id,
+        "user_means": user_means,
+        "users": sorted(ratings["userId"].unique().tolist()),
     }
 
 
+def normalize_scores(scores):
+    scores = pd.Series(scores, dtype=float)
+
+    if scores.empty:
+        return scores
+
+    minimum = scores.min()
+    maximum = scores.max()
+
+    if maximum - minimum < 1e-9:
+        if maximum > 0:
+            return pd.Series(1.0, index=scores.index)
+        return pd.Series(0.0, index=scores.index)
+
+    return (scores - minimum) / (maximum - minimum)
+
+
 def recommend(data, user_id, favorite_ids, limit=10):
-    user_id = int(user_id)
-    if user_id not in data["user_to_index"]:
-        raise ValueError(f"Unknown user ID: {user_id}")
+    ratings = data["ratings"]
+    movies = data["movies"]
+    user_movie_matrix = data["user_movie_matrix"]
+    user_similarity = data["user_similarity"]
+    content_similarity = data["content_similarity"]
+    movie_id_to_index = data["movie_id_to_index"]
+    movie_lookup = data["movie_lookup"]
+    user_means = data["user_means"]
 
-    user_index = data["user_to_index"][user_id]
-    user_movie = data["user_movie"]
-    user_ratings = user_movie.loc[user_id].dropna()
-
-    seen_movies = {int(movie_id) for movie_id in user_ratings.index}
-
-    valid_favorites = list(dict.fromkeys(
-        int(movie_id)
-        for movie_id in favorite_ids
-        if int(movie_id) in data["movie_to_index"]
-    ))
-
-    if not valid_favorites:
-        valid_favorites = [
+    favorite_ids = list(
+        dict.fromkeys(
             int(movie_id)
-            for movie_id, rating in user_ratings.items()
-            if rating >= 4.0 and int(movie_id) in data["movie_to_index"]
-        ]
+            for movie_id in favorite_ids
+            if int(movie_id) in movie_id_to_index
+        )
+    )
 
-    if not valid_favorites:
-        raise ValueError(
-            "Choose at least one favourite movie, or select a user who rated movies 4 stars or higher."
+    user_ratings = user_movie_matrix.loc[user_id]
+    rated_movie_ids = set(
+        user_ratings[user_ratings > 0].index.astype(int)
+    )
+
+    excluded_ids = rated_movie_ids.union(favorite_ids)
+
+    if not favorite_ids:
+        favorite_ids = (
+            ratings[
+                (ratings["userId"] == user_id)
+                & (ratings["rating"] >= 4.0)
+            ]
+            .sort_values("rating", ascending=False)["movieId"]
+            .head(10)
+            .astype(int)
+            .tolist()
         )
 
-    liked_indices = [data["movie_to_index"][m] for m in valid_favorites]
-    tfidf_matrix = data["tfidf_matrix"]
-    user_profile = tfidf_matrix[liked_indices].mean(axis=0)
+    if not favorite_ids:
+        favorite_ids = (
+            ratings[
+                ratings["userId"] == user_id
+            ]
+            .sort_values("rating", ascending=False)["movieId"]
+            .head(5)
+            .astype(int)
+            .tolist()
+        )
 
-    content_scores = cosine_similarity(np.asarray(user_profile), tfidf_matrix).ravel()
-
-    similarities = data["user_similarity"][user_index]
-    neighbor_indices = np.argsort(similarities)[::-1][:TOP_NEIGHBORS]
-    neighbor_indices = [
-        idx for idx in neighbor_indices if idx != user_index and similarities[idx] > 0
+    favorite_indices = [
+        movie_id_to_index[movie_id]
+        for movie_id in favorite_ids
+        if movie_id in movie_id_to_index
     ]
 
-    if not neighbor_indices:
-        return [], []
-
-    rating_array = data["rating_array"]
-    rating_mask = data["rating_mask"]
-    user_means = data["user_means"]
-    rating_movie_ids = data["rating_movie_ids"]
-
-    neighbor_weights = similarities[neighbor_indices]
-    neighbor_ratings = rating_array[neighbor_indices]
-    neighbor_masks = rating_mask[neighbor_indices]
-
-    deviations = np.where(
-        neighbor_masks,
-        neighbor_ratings - user_means[neighbor_indices, None],
-        0.0,
-    )
-
-    weighted_sum = (neighbor_weights[:, None] * deviations).sum(axis=0)
-    available_weights = (neighbor_weights[:, None] * neighbor_masks).sum(axis=0)
-    neighbor_counts = neighbor_masks.sum(axis=0)
-
-    cf_predictions = np.full(len(rating_movie_ids), np.nan, dtype=np.float32)
-    valid_columns = (available_weights > 0) & (neighbor_counts >= 2)
-
-    cf_predictions[valid_columns] = (
-        user_means[user_index]
-        + weighted_sum[valid_columns] / available_weights[valid_columns]
-    )
-
-    candidates = []
-    candidate_predictions = []
-    candidate_content_scores = []
-
-    for movie_id in data["movie_ids"]:
-        movie_id = int(movie_id)
-        if movie_id in seen_movies or movie_id in valid_favorites:
-            continue
-
-        rating_col = data["movie_to_rating_col"].get(movie_id)
-        if rating_col is None:
-            continue
-
-        predicted = cf_predictions[rating_col]
-        if not np.isfinite(predicted):
-            continue
-
-        candidates.append(movie_id)
-        candidate_predictions.append(float(np.clip(predicted, 0.5, 5.0)))
-        candidate_content_scores.append(float(content_scores[data["movie_to_index"][movie_id]]))
-
-    if not candidates:
-        return [], []
-
-    candidate_content_scores = np.asarray(candidate_content_scores, dtype=np.float32)
-    min_content = float(candidate_content_scores.min())
-    max_content = float(candidate_content_scores.max())
-
-    if max_content > min_content:
-        normalized_content = (candidate_content_scores - min_content) / (max_content - min_content)
+    if favorite_indices:
+        content_scores = np.asarray(
+            content_similarity[favorite_indices].mean(axis=0)
+        ).ravel()
     else:
-        normalized_content = np.zeros(len(candidates), dtype=np.float32)
+        content_scores = np.zeros(len(movies))
 
-    cf_results = []
-    hybrid_results = []
+    favorite_lookup_ids = set(favorite_ids)
+    similar_users = user_similarity.loc[user_id].drop(
+        labels=[user_id],
+        errors="ignore",
+    )
 
-    for movie_id, predicted_rating, content_score in zip(
-        candidates, candidate_predictions, normalized_content,
-    ):
-        cf_normalized = (predicted_rating - 0.5) / 4.5
-        hybrid_score = CF_WEIGHT * cf_normalized + CONTENT_WEIGHT * float(content_score)
+    similar_users = similar_users[
+        similar_users > 0
+    ].sort_values(ascending=False).head(TOP_NEIGHBORS)
 
-        movie_row = data["movies"][data["movies"]["movieId"] == movie_id]
-        if movie_row.empty:
+    cf_scores = {}
+
+    for movie_id in movies["movieId"].astype(int):
+        if movie_id in excluded_ids:
             continue
-        movie = movie_row.iloc[0]
 
-        common = {
-            "movieId": movie_id,
-            "title": str(movie["title"]),
-            "genres": str(movie["genres"]),
-            "predicted_rating": round(predicted_rating, 2),
-        }
+        numerator = 0.0
+        denominator = 0.0
+        neighbor_count = 0
 
-        cf_results.append({**common, "score": round(predicted_rating, 4)})
-        hybrid_results.append({**common, "score": round(float(hybrid_score), 4)})
+        for neighbor_id, similarity in similar_users.items():
+            neighbor_rating = user_movie_matrix.at[
+                neighbor_id, movie_id
+            ] if movie_id in user_movie_matrix.columns else 0
 
-    cf_results.sort(key=lambda item: item["predicted_rating"], reverse=True)
-    hybrid_results.sort(key=lambda item: item["score"], reverse=True)
+            if neighbor_rating > 0:
+                neighbor_mean = user_means.get(
+                    neighbor_id,
+                    ratings["rating"].mean(),
+                )
 
-    return cf_results[:limit], hybrid_results[:limit]
+                numerator += similarity * (
+                    neighbor_rating - neighbor_mean
+                )
+                denominator += abs(similarity)
+                neighbor_count += 1
+
+        if denominator > 0 and neighbor_count >= 2:
+            user_mean = user_means.get(
+                user_id,
+                ratings["rating"].mean(),
+            )
+
+            prediction = user_mean + numerator / denominator
+            cf_scores[movie_id] = float(
+                np.clip(prediction, 0.5, 5.0)
+            )
+
+    cf_series = pd.Series(cf_scores, dtype=float)
+
+    if cf_series.empty:
+        cf_results = pd.DataFrame(
+            columns=[
+                "movieId",
+                "title",
+                "genres",
+                "year",
+                "predicted_rating",
+                "score",
+            ]
+        )
+    else:
+        cf_normalized = normalize_scores(cf_series)
+
+        cf_results = pd.DataFrame({
+            "movieId": cf_series.index.astype(int),
+            "predicted_rating": cf_series.values,
+            "score": cf_normalized.values,
+        })
+
+        cf_results = cf_results.merge(
+            movies[["movieId", "title", "genres", "year"]],
+            on="movieId",
+            how="left",
+        )
+
+        cf_results = cf_results.sort_values(
+            ["predicted_rating", "score"],
+            ascending=False,
+        ).head(limit)
+
+    content_by_id = {
+        movie_id: float(content_scores[index])
+        for movie_id, index in movie_id_to_index.items()
+        if movie_id not in excluded_ids
+    }
+
+    content_series = pd.Series(
+        content_by_id,
+        dtype=float,
+    )
+
+    cf_norm_all = normalize_scores(cf_series)
+    content_norm_all = normalize_scores(content_series)
+
+    all_candidate_ids = set(cf_norm_all.index).union(
+        content_norm_all.index
+    )
+
+    hybrid_rows = []
+
+    for movie_id in all_candidate_ids:
+        cf_score = float(cf_norm_all.get(movie_id, 0.0))
+        content_score = float(
+            content_norm_all.get(movie_id, 0.0)
+        )
+
+        hybrid_score = (
+            CF_WEIGHT * cf_score
+            + CONTENT_WEIGHT * content_score
+        )
+
+        if movie_id not in movie_lookup.index:
+            continue
+
+        movie = movie_lookup.loc[movie_id]
+
+        if isinstance(movie, pd.DataFrame):
+            movie = movie.iloc[0]
+
+        predicted_rating = float(
+            np.clip(
+                user_means.get(
+                    user_id,
+                    ratings["rating"].mean(),
+                ) + (hybrid_score - 0.5) * 2.0,
+                0.5,
+                5.0,
+            )
+        )
+
+        hybrid_rows.append({
+            "movieId": int(movie_id),
+            "title": movie["title"],
+            "genres": movie["genres"],
+            "year": movie["year"],
+            "predicted_rating": predicted_rating,
+            "score": hybrid_score,
+            "content_score": content_score,
+            "cf_score": cf_score,
+        })
+
+    hybrid_results = pd.DataFrame(hybrid_rows)
+
+    if not hybrid_results.empty:
+        hybrid_results = hybrid_results.sort_values(
+            ["score", "predicted_rating"],
+            ascending=False,
+        ).head(limit)
+
+    return cf_results, hybrid_results
 
 
-# ---------------------------------------------------------------------------
-# Card Display
-# ---------------------------------------------------------------------------
 def display_movies(results, download_key, is_hybrid=True):
-    if not results:
-        st.warning(
-            "No qualifying movie suggestions found for this user. "
-            "Try picking different favorite movies or another viewer."
+    if results is None or results.empty:
+        st.markdown(
+            """
+            <div class="empty-state">
+                <div class="empty-state-title">No recommendations yet</div>
+                Try another user or add some favourite movies to generate recommendations.
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
         return
 
-    for start in range(0, len(results), 2):
-        columns = st.columns(2, gap="medium")
+    rows = results.reset_index(drop=True)
 
-        for offset, container in enumerate(columns):
+    for start in range(0, len(rows), 2):
+        columns = st.columns(2)
+
+        for offset, column in enumerate(columns):
             index = start + offset
-            if index >= len(results):
+
+            if index >= len(rows):
                 continue
 
-            movie = results[index]
-            raw_title = str(movie["title"])
+            movie = rows.iloc[index]
 
-            year_match = re.search(r"\((\d{4})\)$", raw_title.strip())
-            if year_match:
-                year_text = year_match.group(1)
-                clean_title = raw_title[: year_match.start()].strip()
+            title = escape(str(movie.get("title", "Unknown title")))
+            genres = escape(str(movie.get("genres", "Unknown genres")))
+            year = movie.get("year", "")
+
+            if pd.isna(year) or str(year).strip() == "":
+                year_text = "Year unavailable"
             else:
-                year_text = ""
-                clean_title = raw_title
+                year_text = escape(str(year))
 
-            escaped_title = html.escape(clean_title)
-            genres_list = [g.strip() for g in movie["genres"].split("|") if g.strip()]
-            genre_badges = "".join(
-                f'<span class="genre-pill">{html.escape(g)}</span>'
-                for g in genres_list[:4]
-            )
+            rating = movie.get("predicted_rating", np.nan)
+
+            if pd.isna(rating):
+                rating_text = "N/A"
+            else:
+                rating_text = f"{float(rating):.2f}/5"
 
             if is_hybrid:
-                match_pct = int(movie["score"] * 100)
-                score_badge_html = f'<span class="match-badge">{match_pct}% Match</span>'
-                bar_pct = match_pct
+                match_score = float(movie.get("score", 0.0))
+                match_text = f"Match {match_score * 100:.0f}%"
             else:
-                bar_pct = int((movie["predicted_rating"] / 5.0) * 100)
-                score_badge_html = f'<span class="match-badge">Rank #{index + 1}</span>'
+                match_text = f"Rank #{index + 1}"
 
-            year_badge_html = f'<span class="year-chip">{year_text}</span>' if year_text else ""
-
-            with container:
+            with column:
                 st.markdown(
                     f"""
                     <div class="movie-card">
-                        <div>
-                            <div class="card-top">
-                                <span class="rank-badge">#{index + 1:02d}</span>
-                                <h3 class="movie-title">{escaped_title}</h3>
-                                {year_badge_html}
-                            </div>
-                            <div class="genre-container">
-                                {genre_badges}
-                            </div>
-                        </div>
-                        <div>
-                            <div class="meter-track">
-                                <div class="meter-fill" style="width: {bar_pct}%;"></div>
-                            </div>
-                            <div class="card-footer">
-                                <div class="rating-badge">
-                                    <span class="star">★</span>
-                                    <span>{movie['predicted_rating']:.1f} / 5</span>
-                                    <span class="pred-label">predicted</span>
-                                </div>
-                                {score_badge_html}
-                            </div>
-                        </div>
+                        <div class="movie-rank">RECOMMENDATION {index + 1:02d}</div>
+                        <div class="movie-title">{title}</div>
+                        <div class="movie-year">{year_text}</div>
+                        <div class="movie-genres">{genres}</div>
+                        <span class="movie-score">Predicted {rating_text}</span>
+                        <span class="movie-match">{match_text}</span>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
 
-    table_data = pd.DataFrame(results)
-    friendly_table = pd.DataFrame({
-        "Movie ID": table_data["movieId"],
-        "Title": table_data["title"],
-        "Genres": table_data["genres"].str.replace("|", ", ", regex=False),
-        "Predicted Rating (1-5)": table_data["predicted_rating"],
-    })
+    with st.expander("View recommendation data"):
+        visible_columns = [
+            column
+            for column in [
+                "title",
+                "year",
+                "genres",
+                "predicted_rating",
+                "score",
+                "cf_score",
+                "content_score",
+            ]
+            if column in rows.columns
+        ]
 
-    if is_hybrid:
-        friendly_table["Hybrid Score (0-1)"] = table_data["score"]
-        friendly_table["Match (%)"] = (table_data["score"] * 100.0).round(1)
+        st.dataframe(
+            rows[visible_columns],
+            use_container_width=True,
+            hide_index=True,
+        )
 
-    with st.expander("📊 View results as a table"):
-        st.dataframe(friendly_table, use_container_width=True, hide_index=True)
+    csv_data = rows.to_csv(index=False).encode("utf-8")
 
     st.download_button(
-        "⬇️ Download as CSV",
-        data=friendly_table.to_csv(index=False).encode("utf-8"),
-        file_name=f"movielens_{download_key}_picks.csv",
+        label="Download recommendations as CSV",
+        data=csv_data,
+        file_name="movielens_recommendations.csv",
         mime="text/csv",
-        key=f"download_{download_key}",
+        key=download_key,
+        use_container_width=False,
     )
 
 
-# ---------------------------------------------------------------------------
-# Callbacks
-# ---------------------------------------------------------------------------
 def add_favourite(label_to_id):
-    label = st.session_state.get("add_choice")
-    if label and label in label_to_id:
-        movie_id = label_to_id[label]
-        if movie_id not in st.session_state["fav_ids"]:
-            st.session_state["fav_ids"].append(movie_id)
-    st.session_state["add_choice"] = None
+    selected_title = st.session_state.get("selected_movie_to_add")
+
+    if selected_title and selected_title in label_to_id:
+        movie_id = int(label_to_id[selected_title])
+        current = st.session_state.get("favorite_ids", [])
+
+        if movie_id not in current:
+            st.session_state["favorite_ids"] = current + [movie_id]
 
 
 def remove_favourite(movie_id):
-    st.session_state["fav_ids"] = [
-        item for item in st.session_state["fav_ids"] if item != movie_id
+    current = st.session_state.get("favorite_ids", [])
+    st.session_state["favorite_ids"] = [
+        item for item in current if item != movie_id
     ]
 
 
 st.markdown(
-    f"""
-    <div class="hero-wrap">
-        <div class="hero-eyebrow">
-            <span class="dot"></span>
-            MovieLens - Hybrid Recommender
+    """
+    <div class="hero">
+        <div class="hero-eyebrow">PERSONALIZED MOVIE DISCOVERY</div>
+        <div class="hero-title">
+            Find your next<br>
+            <span class="gradient-text">favorite movie.</span>
         </div>
-        <h1 class="hero-title">
-            Find your next <span class="gradient">obsession</span>.
-        </h1>
-        <p class="hero-sub">
-            A dual-engine recommender blending collaborative community intelligence
-            with deep content understanding — so every suggestion feels hand-picked.
-        </p>
-        <div class="hero-meta">
-            <div class="hero-meta-item">
-                <div class="icon">🎯</div>
-                <div><strong>Hybrid Engine</strong> · CF + Content</div>
-            </div>
-            <div class="hero-meta-item">
-                <div class="icon">⚡</div>
-                <div><strong>Real-time</strong> · Instant scoring</div>
-            </div>
-            <div class="hero-meta-item">
-                <div class="icon">🛡️</div>
-                <div><strong>Neighborhood Guard</strong> · Min. 2 verified neighbors</div>
-            </div>
+        <div class="hero-description">
+            Discover movies tailored to your taste with a hybrid recommendation
+            engine combining collaborative filtering and content-based similarity.
         </div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
+
 try:
-    with st.spinner("Warming up the engine…"):
-        data = load_data()
+    data = load_data()
 
-    movies_df = data["movies"].drop_duplicates(subset=["movieId"]).copy()
-    ratings_df = data["ratings"]
+    ratings = data["ratings"]
+    movies = data["movies"]
+    users = data["users"]
+    title_to_id = data["title_to_id"]
 
-    # ---------- SIDEBAR ----------
     st.sidebar.markdown(
-        '<div class="side-brand">'
-        '<div class="logo">🎬</div>'
-        f'<div class="name">{html.escape(APP_NAME)}</div>'
-        '</div>',
+        f"""
+        <div class="sidebar-brand">
+            <div class="sidebar-brand-title">
+                <span class="gradient-text">MovieLens</span>
+            </div>
+            <div class="sidebar-brand-subtitle">
+                Hybrid Recommendation System
+            </div>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
-    st.sidebar.divider()
 
-    user_ids = sorted(int(user_id) for user_id in data["user_ids"])
+    st.sidebar.markdown(
+        '<div class="section-kicker">PERSONALIZE</div>',
+        unsafe_allow_html=True,
+    )
 
-    st.sidebar.markdown('<div class="side-section">👤 Viewer Profile</div>', unsafe_allow_html=True)
     selected_user = st.sidebar.selectbox(
-        "Select viewer",
-        user_ids,
-        label_visibility="collapsed",
+        "Select a user",
+        options=users,
+        format_func=lambda user_id: f"User {user_id}",
+        key="selected_user",
     )
 
-    user_ratings = ratings_df[ratings_df["userId"] == selected_user]
-    st.sidebar.markdown(
-        f'<div class="user-pill"><span class="dot"></span>'
-        f'<strong>User #{selected_user}</strong> · {len(user_ratings):,} ratings</div>',
-        unsafe_allow_html=True,
+    if "favorite_ids" not in st.session_state:
+        st.session_state["favorite_ids"] = []
+
+    user_rated_ids = set(
+        ratings.loc[
+            ratings["userId"] == selected_user,
+            "movieId",
+        ].astype(int)
     )
 
-    favourite_rated = user_ratings[user_ratings["rating"] >= 4.0].sort_values("rating", ascending=False)
-    default_ids = [
-        int(m) for m in favourite_rated["movieId"].tolist()[:5]
-        if int(m) in data["movie_to_index"]
+    favorite_ids = st.session_state["favorite_ids"]
+    valid_movie_ids = set(movies["movieId"].astype(int))
+
+    favorite_ids = [
+        movie_id
+        for movie_id in favorite_ids
+        if movie_id in valid_movie_ids
     ]
 
-    if st.session_state.get("fav_user") != selected_user:
-        st.session_state["fav_user"] = selected_user
-        st.session_state["fav_ids"] = list(default_ids)
-        st.session_state["add_choice"] = None
-
-    movie_options = {
-        f"{row.title} (ID: {int(row.movieId)})": int(row.movieId)
-        for row in movies_df.itertuples(index=False)
-    }
-    id_to_label = {movie_id: label for label, movie_id in movie_options.items()}
-
-    favourite_ids = [m for m in st.session_state["fav_ids"] if m in id_to_label]
+    st.session_state["favorite_ids"] = favorite_ids
 
     st.sidebar.markdown(
-        f'<div class="side-section">⭐ Favorites <span class="count">({len(favourite_ids)})</span></div>',
+        '<div class="section-kicker">YOUR FAVOURITES</div>',
         unsafe_allow_html=True,
     )
 
-    if favourite_ids:
-        try:
-            holder = (
-                st.sidebar.container(height=230) if len(favourite_ids) > 4
-                else st.sidebar.container()
-            )
-        except TypeError:
-            holder = st.sidebar.container()
+    if favorite_ids:
+        for movie_id in favorite_ids:
+            movie_title = data["movie_lookup"].loc[movie_id, "title"]
 
-        with holder:
-            for movie_id in favourite_ids:
-                col_txt, col_btn = st.columns([5, 1])
-                col_txt.markdown(
-                    f'<div class="fav-item-row">{html.escape(id_to_label[movie_id])}</div>',
+            left, right = st.sidebar.columns([5, 1])
+
+            with left:
+                st.markdown(
+                    f"<div style='font-size:0.8rem;padding:0.35rem 0;'>"
+                    f"{escape(str(movie_title))}</div>",
                     unsafe_allow_html=True,
                 )
-                col_btn.button(
-                    "✕",
-                    key=f"rm_{movie_id}",
-                    help="Remove movie",
+
+            with right:
+                st.button(
+                    "×",
+                    key=f"remove_{movie_id}",
                     on_click=remove_favourite,
                     args=(movie_id,),
                 )
     else:
-        st.sidebar.info("No favorites selected. Using viewer's top-rated movies.")
+        st.sidebar.caption(
+            "Add movies you enjoy to personalize your recommendations."
+        )
 
-    st.sidebar.markdown('<div class="side-section">➕ Add Movie</div>', unsafe_allow_html=True)
-    available_labels = [label for label, mid in movie_options.items() if mid not in favourite_ids]
+    unrated_movies = movies[
+        ~movies["movieId"].isin(user_rated_ids)
+    ]
+
+    movie_options = {
+        row["title"]: int(row["movieId"])
+        for _, row in unrated_movies.sort_values("title").iterrows()
+    }
+
     st.sidebar.selectbox(
-        "Search movie to add",
-        options=available_labels,
-        index=None,
-        placeholder="Type a movie name…",
-        key="add_choice",
-        label_visibility="collapsed",
+        "Find a movie to add",
+        options=[""] + list(movie_options.keys()),
+        key="selected_movie_to_add",
     )
+
     st.sidebar.button(
-        "＋ Add to Favorites",
-        key="add_movie_btn",
+        "＋ Add favourite",
         on_click=add_favourite,
         args=(movie_options,),
+        use_container_width=True,
     )
 
-    selected_favorites = list(favourite_ids)
-
-    st.sidebar.divider()
-    st.sidebar.markdown('<div class="side-section">🎚️ Result Count</div>', unsafe_allow_html=True)
-    top_n = st.sidebar.slider(
-        "Recommendations to show",
-        min_value=5, max_value=20, value=10, step=5,
-        label_visibility="collapsed",
+    recommendation_limit = st.sidebar.slider(
+        "Number of recommendations",
+        min_value=5,
+        max_value=20,
+        value=10,
+        step=5,
     )
 
-    st.sidebar.caption(f"Created by {html.escape(AUTHOR)}")
-
-    # ---------- KPI STATS ----------
-    st.markdown(
+    st.sidebar.markdown(
         f"""
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon red">🎞️</div>
-                <div class="stat-label">Catalog</div>
-                <div class="stat-value">{len(movies_df):,}</div>
-                <div class="stat-sub">movies indexed</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon gold">⭐</div>
-                <div class="stat-label">Ratings</div>
-                <div class="stat-value">{len(ratings_df):,}</div>
-                <div class="stat-sub">verified reviews</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon violet">👥</div>
-                <div class="stat-label">Viewers</div>
-                <div class="stat-value">{ratings_df['userId'].nunique():,}</div>
-                <div class="stat-sub">profile vectors</div>
-            </div>
+        <div class="sidebar-credit">
+            <span class="credit-label">DESIGNED &amp; BUILT BY</span>
+            <span class="credit-name">{escape(AUTHOR)}</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    cf_pct = int(round(CF_WEIGHT * 100))
-    content_pct = int(round(CONTENT_WEIGHT * 100))
+    total_movies = movies["movieId"].nunique()
+    total_users = ratings["userId"].nunique()
+    total_ratings = len(ratings)
+    avg_rating = ratings["rating"].mean()
 
-    # ---------- MODEL PANEL ----------
+    st.markdown(
+        """
+        <div class="section-kicker">YOUR DATASET</div>
+        <div class="section-heading">MovieLens at a glance</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    stat_columns = st.columns(4)
+
+    stats = [
+        ("MOVIES", f"{total_movies:,}", "Titles in the catalogue"),
+        ("USERS", f"{total_users:,}", "Unique rating profiles"),
+        ("RATINGS", f"{total_ratings:,}", "Interactions analysed"),
+        ("AVG. RATING", f"{avg_rating:.2f}/5", "Across all ratings"),
+    ]
+
+    for column, stat in zip(stat_columns, stats):
+        label, value, note = stat
+
+        with column:
+            st.markdown(
+                f"""
+                <div class="stat-card">
+                    <div class="stat-label">{label}</div>
+                    <div class="stat-value">{value}</div>
+                    <div class="stat-note">{note}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
     st.markdown(
         f"""
         <div class="model-panel">
-            <div class="model-header">
-                <span class="badge">Hybrid Engine</span>
-                <h3>How recommendations are scored</h3>
+            <div class="model-title">Hybrid recommendation engine</div>
+            <div class="model-description">
+                Collaborative filtering identifies patterns from similar users.
+                Content-based filtering compares movie genres and available tags
+                to estimate similarity to your preferences.
             </div>
-            <p class="model-body">
-                Every movie gets a composite score blending <strong>collaborative filtering</strong>
-                (what viewers with your taste rated highly) with <strong>content similarity</strong>
-                (TF-IDF across genres & tags). Already-rated titles are automatically excluded.
-            </p>
-            <div class="weight-bar">
-                <div class="seg-cf" style="width: {cf_pct}%;"></div>
-                <div class="seg-content" style="width: {content_pct}%;"></div>
-            </div>
-            <div class="weight-labels">
-                <span><strong>{cf_pct}%</strong> Collaborative Filtering</span>
-                <span><strong>{content_pct}%</strong> Content Similarity</span>
-            </div>
-            <div class="model-foot">
-                <span>🛡️</span>
-                <span>Predictions require at least two positive-similarity neighbors who rated the title.</span>
-            </div>
+            <span class="model-pill">Collaborative Filtering · {CF_WEIGHT:.0%}</span>
+            <span class="model-pill">Content Similarity · {CONTENT_WEIGHT:.0%}</span>
+            <span class="model-pill">Top Neighbours · {TOP_NEIGHBORS}</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # ---------- MAIN ACTION ----------
-    if st.button("✨ Get Recommendations", key="main_recommend_btn"):
-        try:
-            with st.spinner("Calculating neighborhood similarities and hybrid vectors…"):
-                cf_results, hybrid_results = recommend(
-                    data, selected_user, selected_favorites, top_n,
-                )
-
-            st.session_state["cf_results"] = cf_results
-            st.session_state["hybrid_results"] = hybrid_results
-            st.session_state["results_user"] = selected_user
-            st.session_state["results_favorites"] = sorted(selected_favorites)
-            st.session_state["results_limit"] = top_n
-
-        except Exception as error:
-            st.error(f"Computation error: {error}")
-
-    results_match = (
-        st.session_state.get("results_user") == selected_user
-        and st.session_state.get("results_favorites") == sorted(selected_favorites)
-        and st.session_state.get("results_limit") == top_n
+    st.markdown(
+        """
+        <div class="section-kicker">DISCOVER</div>
+        <div class="section-heading">Recommendations for you</div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    if results_match:
-        st.markdown(
-            '<div class="section-title">'
-            '<span class="accent-line"></span>'
-            'Your Recommendations'
-            '</div>',
-            unsafe_allow_html=True,
-        )
+    st.write(
+        "Choose a user, add favourite movies if you want, and generate a ranked list."
+    )
+
+    if st.button(
+        "✦ Generate recommendations",
+        key="generate_recommendations",
+        use_container_width=True,
+    ):
+        st.session_state["recommendations_generated"] = True
+
+    if st.session_state.get("recommendations_generated", False):
+        with st.spinner("Analysing movie preferences and rating patterns..."):
+            cf_results, hybrid_results = recommend(
+                data,
+                selected_user,
+                st.session_state["favorite_ids"],
+                recommendation_limit,
+            )
 
         hybrid_tab, cf_tab = st.tabs([
-            f"✨ Best Overall Mix · {len(st.session_state['hybrid_results'])}",
-            f"👥 Similar Viewers Only · {len(st.session_state['cf_results'])}",
+            "✦ Hybrid recommendations",
+            "◈ Collaborative filtering",
         ])
 
         with hybrid_tab:
-            st.markdown(
-                f'<p class="section-desc">'
-                f'<strong>Hybrid model:</strong> {cf_pct}% collaborative + {content_pct}% content similarity. '
-                f'Sorted by match strength.'
-                f'</p>',
-                unsafe_allow_html=True,
+            st.caption(
+                "Combines collaborative filtering and content similarity "
+                "using the configured model weights."
             )
+
             display_movies(
-                st.session_state["hybrid_results"],
-                download_key="hybrid",
+                hybrid_results,
+                download_key="download_hybrid",
                 is_hybrid=True,
             )
 
         with cf_tab:
-            st.markdown(
-                '<p class="section-desc">'
-                '<strong>Collaborative filtering:</strong> ranked strictly by predicted rating '
-                'from viewers who share your taste.'
-                '</p>',
-                unsafe_allow_html=True,
+            st.caption(
+                "Recommendations based on ratings from users with similar preferences."
             )
+
             display_movies(
-                st.session_state["cf_results"],
-                download_key="cf",
+                cf_results,
+                download_key="download_cf",
                 is_hybrid=False,
             )
-    else:
-        st.info("👉 Click **'Get Recommendations'** above to generate your personalized picks.")
 
-    # ---------- FOOTER ----------
+    else:
+        st.markdown(
+            """
+            <div class="empty-state">
+                <div class="empty-state-title">Ready when you are</div>
+                Generate recommendations to explore movies ranked for your selected user.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
     st.markdown(
         f"""
         <div class="app-footer">
-            <div class="brand">
-                <div class="stat-icon red" style="width:28px;height:28px;font-size:0.8rem;margin:0;">🎬</div>
-                <span>Designed & built by <strong>{html.escape(AUTHOR)}</strong></span>
+            <div class="footer-brand">
+                <span class="gradient-text">MovieLens</span>
+                <span style="color:#778195;font-weight:400;"> · Hybrid Recommender</span>
             </div>
-            <div class="tech">Python · Streamlit · scikit-learn · Pandas · NumPy</div>
+            <div class="footer-credit">
+                Designed &amp; built by <span>{escape(AUTHOR)}</span>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 except FileNotFoundError as error:
-    st.error(
-        "Dataset file not found. Ensure ratings.csv, movies.csv, "
-        "and tags.csv are inside the 'data/' folder."
+    st.error("Required dataset files were not found.")
+    st.code(str(error))
+    st.info(
+        "Place ratings.csv, movies.csv, and optionally tags.csv inside the data folder."
     )
-    st.exception(error)
 
 except Exception as error:
-    st.error("The recommendation engine could not be loaded.")
+    st.error("The application could not finish loading.")
     st.exception(error)
