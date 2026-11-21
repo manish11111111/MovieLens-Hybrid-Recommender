@@ -958,7 +958,7 @@ def display_movies(results, download_key, is_hybrid=True):
 
         st.dataframe(
             rows[visible_columns],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -1114,7 +1114,7 @@ try:
         "＋ Add favourite",
         on_click=add_favourite,
         args=(movie_options,),
-        use_container_width=True,
+        width="stretch",
     )
 
     recommendation_limit = st.sidebar.slider(
@@ -1204,7 +1204,7 @@ try:
     if st.button(
         "✦ Generate recommendations",
         key="generate_recommendations",
-        use_container_width=True,
+       width="stretch",
     ):
         st.session_state["recommendations_generated"] = True
 
